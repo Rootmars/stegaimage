@@ -116,26 +116,35 @@ class StegaImage:
 
         return bytearray(message)
 
-    def write(self, phrase):
-        """Writes a new phrase onto the image.
+    def write(self, message):
+        """Writes a new message onto the image.
 
         Args:
-            phrase: The message that will be embedded onto the image.
+            message: The message that will be embedded onto the image.
         """
 
         # Length-encoding step.
-        length_in_bits = len(phrase)*8
+        length_in_bits = len(message)*8
         for i in range(0, 32):
             self._set_bit(i, (length_in_bits >> (31-i)) & 1)
         
-        # Phrase-encoding step.
-        phrase_as_bytes = bytearray(phrase)
+        # Message-encoding step.
+        message_as_bytes = bytearray(message)
         for i in range(0, length_in_bits):
             byte_index = (i) // 8
             bit_offset = 7 - (i%8)
-            self._set_bit(33 + i, (phrase_as_bytes[byte_index] >> (bit_offset)) & 1)
+            self._set_bit(33 + i, (message_as_bytes[byte_index] >> (bit_offset)) & 1)
 
         return
+
+    def message_will_fit(self, message):
+        """Checks if a message will fit into the image.
+
+        Args:
+            message: The message we want to check.
+        """
+
+        return len(message) * 8 <= self._bit_limit() - 11*8
 
 # argparse setup starts here.
 # Callback for the "write" mode.
@@ -149,8 +158,13 @@ def write_command(args):
         with open(args.file, "rb") as input_file:
             message = bytearray(input_file.read())
 
-    stega_img.write(message)
-    stega_img.save(args.output_image)
+    if stega_img.message_will_fit(message):
+        stega_img.write(message)
+        stega_img.save(args.output_image)
+        sys.exit(0)
+    else:
+        parser.error("The message being hidden is too large.")
+        sys.exit(1)
 
 # Callback for the "read" mode.
 def read_command(args):

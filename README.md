@@ -25,7 +25,7 @@ can be written into an image.
 
 ## Requirements
 
-This program requires `Python` and the `Pillow` module to run.
+This program requires `Python 2` and the `Pillow` module to run.
 
 
 ## Instructions
@@ -58,7 +58,7 @@ for more help regarding `read` mode, run:
 
 	$ python stegaimage.py write input_image.png output_image.png --phrase "Hello, World!"
 
-Will write the phrase "Hello, World!" into input_image.png, and saves the output
+Will write the phrase "Hello, World!" into `input_image.png`, and saves the output
 to `ouput_image.png`
 
 The above example gets the input message from argv (via the `--phrase` argument.) The full
