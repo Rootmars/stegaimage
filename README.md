@@ -36,30 +36,39 @@ This program can be run in two modes: `read` and `write`
 
 `read` mode reads a message from an image. The following command:
 
-	$ python stegaimage.py read input_image.png
+    $ python stegaimage.py read input_image.png
 
 Will output the message hidden in `input_image.png` to stdout.
 
 To write output to a file instead, an optional third parameter can
 be provided. The following command:
 
-	$ python stegaimage.py read input_image.png output.txt
+    $ python stegaimage.py read input_image.png output.txt
 
 Will write the message hidden in `input_image.png` to the 
 file `output.txt` instead.
 
 for more help regarding `read` mode, run:
 
-	$ python stegaimage.py read --help
+    $ python stegaimage.py read --help
 
 ### `write` Mode
 
 `write` mode writes a message into an image. The following command:
 
-	$ python stegaimage.py write input_image.png output_image.png --phrase "Hello, World!"
+    $ python stegaimage.py write input_image.png output_image.png --phrase "Hello, World!"
 
 Will write the phrase "Hello, World!" into `input_image.png`, and saves the output
 to `ouput_image.png`
+
+The `output\_image` parameter is actually optional. Omitting this paramter will cause the image
+to be outputed to stdout.
+
+To specify the type of image to output, use the `--type` parameter, like so:
+
+    $ python stegaimage.py write input_image.png output_image.png --type png --phrase "Hello, World!"
+
+This will force the output's filetype into png, regardless of the file extension given for `output_image`    
 
 The above example gets the input message from argv (via the `--phrase` argument.) The full
 list of ways in which to input the message is as follows:
@@ -68,7 +77,7 @@ list of ways in which to input the message is as follows:
 
 The following command:
 
-	$ python stegaimage.py write input_image.png output_image.png --stdin < message_file.txt
+    $ python stegaimage.py write input_image.png output_image.png --stdin < message_file.txt
 
 will take input from stdin (in this case, the file `message_file.txt` is redirected as input) 
 and hides the input into the image.
@@ -80,7 +89,7 @@ Input can then be stopped with `EOF` (`Ctrl-D`).
 
 The following command:
 
-	$ python stegaimage.py write input_image.png output_image.png --file message_file.txt
+    $ python stegaimage.py write input_image.png output_image.png --file message_file.txt
 
 will take input from the file called `message.txt` and hides the input into the image.
 
@@ -88,13 +97,13 @@ will take input from the file called `message.txt` and hides the input into the 
 
 The following command:
 
-	$ python stegaimage.py write input_image.png output_image.png --phrase "Hello, World!"
+    $ python stegaimage.py write input_image.png output_image.png --phrase "Hello, World!"
 
 will hide the phrase "Hello, World!" into the image.
 
 for more help regarding `write` mode, run:
 
-	$ python stegaimage.py write --help
+    $ python stegaimage.py write --help
 
 ### Extra Features
 
@@ -102,12 +111,12 @@ Arbitrary data (not just textual data) can be written to an image.
 
 The following command:
 
-	$ python stegaimage.py write input_image.png output_image.png --file hidden_image.png
+    $ python stegaimage.py write input_image.png output_image.png --file hidden_image.png
 
 Will hide `hidden_image.png` in `input_image.png` and saves the output to `output_image.png`
 
 
 To recover `hidden_image.png` from `output_image.png`, the following command can be run:
 
-	$ python stegaimage.py read output_image.png recovered_hidden_image.png
+    $ python stegaimage.py read output_image.png recovered_hidden_image.png
 

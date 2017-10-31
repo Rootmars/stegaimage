@@ -23,10 +23,15 @@ class StegaImage:
         
         Args:
             filename: A path of the image to be opened.
+
+        Raises:
+            ValueError: If the image is too small (<11 pixels).
         """
 
         self.image = Image.open(filename)
         self.data = list(self.image.getdata())
+        if self._raw_bits_limit() < 32:
+            raise ValueError("This image is too small. Image must have at least 11 pixels.")
     
     def _get_bit(self, offset):
         """Gets the value of the bit at a specified offset.
@@ -38,7 +43,7 @@ class StegaImage:
             IndexError: If the specified offset is outside of the image's bounds.
         """
 
-        offset_max = self._bit_limit()-1
+        offset_max = self._raw_bits_limit()-1
         if offset > offset_max: 
             raise IndexError("Bit offset too large. Limit for this image is {}".format(offset_max))
 
@@ -59,7 +64,7 @@ class StegaImage:
             IndexError: If the specified offset is outside of the image's bounds.
         """
 
-        offset_max = self._bit_limit()-1
+        offset_max = self._raw_bits_limit()-1
         if offset > offset_max: 
             raise IndexError("Bit offset too large. Limit for this image is {}".format(offset_max))
 
@@ -76,12 +81,17 @@ class StegaImage:
 
         self.data[pixel_index] = tuple(pixel_data_as_list)
 
-    def _bit_limit(self):
-        """Gets the maximum number of encodable bits in the image."""
+    def _raw_bits_limit(self):
+        """Gets the maximum number of raw encodable bits in the image."""
 
         return len(self.data) * 3
 
-    def save(self, filename):
+    def _message_bits_limit(self):
+        """Gets the maximum number of encodable bits for the message in the image"""
+
+        return self._raw_bits_limit() - 11*3
+
+    def save(self, filename, filetype=None):
         """Saves the image at its current state to a new file.
 
         Note:
@@ -90,19 +100,37 @@ class StegaImage:
         Args:
             filename: A path to while the image will be saved.
                 The file type is determined by the file extension.
+
+        Raises:
+            KeyError: If the filename doesn't have a valid file extension and filetype isn't set.
         """
 
         self.image.putdata(self.data)
-        self.image.save(filename)
+        if filetype:
+            self.image.save(filename, filetype)
+        else:
+            self.image.save(filename)
 
     def read(self):
-        """Reads the message encoded in the image."""
+        """Reads the message encoded in the image.
+        
+        Raises:
+            RuntimeError: If the encoded length is longer than the longest possible message.
+        """
 
         # Read the length of the embedded message.
         msg_length = 0
         for i in range(0, 32):
             bit = self._get_bit(i)
             msg_length += bit << (31-i)
+
+        # Throw something if the message length is longer than what
+        # the image can hold.
+        # (this probably also means that there wasn't a message in the
+        # image in the first place)
+        if msg_length > self._raw_bits_limit() - 11*3:
+            raise RuntimeError("The message length is {} bits, but the image can only store"
+                "at most {} message bits".format(msg_length, self._message_bits_limit()))
 
         # Read the message character-by-character.
         message = ""
@@ -144,12 +172,19 @@ class StegaImage:
             message: The message we want to check.
         """
 
-        return len(message) * 8 <= self._bit_limit() - 11*8
+        return len(message) * 8 <= self._message_bits_limit()
 
 # argparse setup starts here.
 # Callback for the "write" mode.
 def write_command(args):
-    stega_img = StegaImage(args.input_image)
+    stega_img = None
+    try:
+        stega_img = StegaImage(args.input_image)
+    except ValueError as e:
+        print(e)
+        exit(1)
+
+    message = ""
     if args.phrase:
         message = bytearray(args.phrase)
     elif args.stdin:
@@ -160,21 +195,53 @@ def write_command(args):
 
     if stega_img.message_will_fit(message):
         stega_img.write(message)
-        stega_img.save(args.output_image)
+
+        output_dest = None
+        filetype = None
+        if args.output_image:
+            output_dest = args.output_image
+            if args.type:
+                filetype = args.filetype
+        else:
+            output_dest = sys.stdout
+            if args.type:
+                filetype = args.type
+            else:
+                filetype = "png"
+
+        try:
+            stega_img.save(output_dest, filetype)
+        except KeyError:
+            stega_img.save(output_dest, "png")
+            
         sys.exit(0)
     else:
-        parser.error("The message being hidden is too large.")
+        print("The message being hidden is too large.")
         sys.exit(1)
 
 # Callback for the "read" mode.
 def read_command(args):
-    stega_img = StegaImage(args.input_image)
-    message = stega_img.read()
+    stega_img = None
+    try:
+        stega_img = StegaImage(args.input_image)
+    except ValueError as e:
+        print(e)
+        exit(1)
+
+    message = None
+    try:
+        message = stega_img.read()
+    except RuntimeError as e:
+        print(e)
+        exit(1)
+        
     if args.output_file:
         with open(args.output_file, "wb") as f:
             f.write(message)
     else:
         print(message)
+
+    exit(0)
 
 parser = argparse.ArgumentParser()
 
@@ -189,7 +256,7 @@ read_parser = subparsers.add_parser("read",
     enter `./stegaimage.py read --help` for more info.""")
 read_parser.set_defaults(func=read_command)
 read_parser.add_argument("input_image", help="a path to an image from which a hidden message will be read.")
-read_parser.add_argument("output_file", nargs="?", type=str, help="a path to a file nto which the result will be saved")
+read_parser.add_argument("output_file", nargs="?", type=str, help="a path to a file into which the result will be saved")
 
 # Write mode usage:
 # $ stegaimage write INPUT_IMAGE OUTPUT_IMAGE [--phrase | --stdin | --file]
@@ -198,9 +265,10 @@ read_parser.add_argument("output_file", nargs="?", type=str, help="a path to a f
 write_parser = subparsers.add_parser("write", 
     help="""embeds a message into an image.
     enter `./stegaimage.py write --help` for more info.""")
-write_parser.add_argument("input_image", type=str, help="a path to an image into which the message will be embedded")
-write_parser.add_argument("output_image", type=str, help="a path to an image into which the result will be saved")
 write_parser.set_defaults(func=write_command)
+write_parser.add_argument("input_image", type=str, help="a path to an image into which the message will be embedded")
+write_parser.add_argument("output_image", nargs="?", type=str, help="a path to an image into which the result will be saved")
+write_parser.add_argument("-t", "--type", help="filetype hint. overrides the filetype of output_image.")
 phrase_group = write_parser.add_mutually_exclusive_group()
 phrase_group.add_argument("-p", "--phrase", help="embed a brief phrase into the image")
 phrase_group.add_argument("-s", "--stdin", help="embed input from stdin into the image", action="store_true")
