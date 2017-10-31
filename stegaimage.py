@@ -100,6 +100,7 @@ class StegaImage:
         Args:
             filename: A path to while the image will be saved.
                 The file type is determined by the file extension.
+            filetype: Will override the filetype determined from filename's extension.
 
         Raises:
             KeyError: If the filename doesn't have a valid file extension and filetype isn't set.
